@@ -1,36 +1,26 @@
-import { makeStyles } from '@material-ui/core'
 import React, { useEffect, useState } from 'react'
 import AliceCarousel from 'react-alice-carousel'
 import { Link } from 'react-router-dom'
 import { TrendingCoins } from '../config/api'
 import { CryptoState } from '../CryptoContext'
-const useStyles = makeStyles((theme) => ({
-    carousel: {
-        height: '50%',
-        display: 'flex',
-        alignItems: 'center',
-    },
-    carouselItem: {
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        cursor: 'pointer',
-        textTransform: 'uppercase',
-        color: 'white',
-
-    }
-}));
 export const numberWithCommas = (x) => {
-    return x.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+    if (x === null || x === undefined || !Number.isFinite(Number(x))) return '—';
+    return Number(x).toLocaleString('en-US');
 }
 const Caraousel = () => {
-    const { currency, symbol } = CryptoState();
+    const { currency, symbol, setAlert } = CryptoState();
     const [trending, setTrending] = useState([])
-    const classes = useStyles();
     const fetchTrendingCoins = async () => {
-        const response = await fetch(TrendingCoins(currency));
-        const data = await response.json();
-        setTrending(data);
+        try {
+            const response = await fetch(TrendingCoins(currency));
+            if (!response.ok) throw new Error(`Coin data request failed (${response.status}).`);
+            const data = await response.json();
+            if (!Array.isArray(data)) throw new Error('Coin service returned invalid data.');
+            setTrending(data);
+        } catch (error) {
+            setTrending([]);
+            setAlert({ open: true, message: error.message || 'Unable to load trending coins.', type: 'error' });
+        }
     }
     useEffect(() => {
         fetchTrendingCoins();
@@ -40,7 +30,8 @@ const Caraousel = () => {
         let profit = coin?.price_change_percentage_24h >= 0;
         return <Link
             to={`/coins/${coin.id}`}
-            className={classes.carouselItem}
+            className="carousel-item"
+            key={coin.id}
         >
             <img
                 src={coin?.image}
@@ -54,10 +45,10 @@ const Caraousel = () => {
                 <span style={{
                     color: profit ? '#00ff00' : 'red',
                     fontWeight: '500',
-                }}>{profit && '+'}{coin?.price_change_percentage_24h?.toFixed(2)}</span>
+                }}>{profit && '+'}{Number.isFinite(coin?.price_change_percentage_24h) ? coin.price_change_percentage_24h.toFixed(2) : '—'}</span>
             </span>
             <span style={{ fontSize: 22, fontWeight: 500 }}>
-                {symbol}{numberWithCommas(coin?.current_price.toFixed(2))}
+                {symbol}{numberWithCommas(coin?.current_price)}
             </span>
         </Link>
     })
@@ -66,7 +57,7 @@ const Caraousel = () => {
         512: { items: 4 },
     };
     return (
-        <div className={classes.carousel}>
+        <div className="trending-carousel">
             <AliceCarousel
                 mouseTracking
                 infinite

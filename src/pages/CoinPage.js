@@ -1,197 +1,95 @@
-import React from "react";
-import { useState, useEffect } from "react";
-import { useParams } from "react-router-dom";
-import { CryptoState } from "../CryptoContext"
-import { SingleCoin } from "../config/api"
-import { makeStyles } from "@material-ui/styles";
-import CoinInfo from "../components/CoinInfo";
-import { Typography, LinearProgress, Button } from "@material-ui/core";
-import parse from 'html-react-parser'
+import React, { useEffect, useState } from 'react';
+import { useParams } from 'react-router-dom';
+import { Alert, Button, LinearProgress, Typography } from '@mui/material';
+import { doc, setDoc } from 'firebase/firestore';
+import parse from 'html-react-parser';
+import { CryptoState } from '../CryptoContext';
+import { SingleCoin } from '../config/api';
+import CoinInfo from '../components/CoinInfo';
 import { numberWithCommas } from '../components/Caraousel';
-import { doc, onSnapshot, setDoc } from "firebase/firestore";
-import { db } from "../firebase";
+import { db } from '../firebase';
+
 const CoinPage = () => {
     const { id } = useParams();
-    const [coin, setCoin] = useState();
-    const { currency, symbol, watchlist, setAlert } = CryptoState();
+    const [coin, setCoin] = useState(null);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState('');
+    const { currency, symbol, watchlist, setAlert, user } = CryptoState();
     const inWatchlist = watchlist.includes(coin?.id);
-    const fetchCoin = async () => {
-        const response = await fetch(SingleCoin(id));
-        const data = await response.json();
-        setCoin(data);
-    }
+
     useEffect(() => {
-        fetchCoin();
-    }, [currency]);
-    const useStyles = makeStyles((theme) => ({
-        container: {
-            display: "flex",
-            [theme.breakpoints.down("md")]: {
-                flexDirection: "column",
-                alignItems: "center",
+        let active = true;
+        const fetchCoin = async () => {
+            setLoading(true);
+            setError('');
+            setCoin(null);
+            try {
+                const response = await fetch(SingleCoin(id));
+                if (!response.ok) throw new Error(`Coin request failed (${response.status}).`);
+                const data = await response.json();
+                if (!data?.id || !data?.market_data) throw new Error('Coin service returned incomplete data.');
+                if (active) setCoin(data);
+            } catch (requestError) {
+                if (active) setError(requestError.message || 'Unable to load this coin.');
+            } finally {
+                if (active) setLoading(false);
             }
-        },
-        sidebar: {
-            display: 'flex',
-            width: "30%",
-            [theme.breakpoints.down("md")]: {
-                width: "100%",
-            },
-            flexDirection: 'column',
-            alignItems: "center",
-            marginTop: 25,
-            borderRight: "2px solid gray"
-        },
-        heading: {
-            fontWeight: "bold",
-            marginBottom: 20,
-            fontFamily: "Montserrat",
+        };
+        fetchCoin();
+        return () => { active = false; };
+    }, [id]);
 
-        },
-        description: {
-            width: "100%",
-            fontFamily: "Montserrat",
-            padding: 25,
-            paddingBottom: 15,
-            paddingTop: 0,
-            textAlign: 'justify',
-        },
-        marketData: {
-            alignSelf: "start",
-            padding: 25,
-            paddingTop: 10,
-            width: "100%",
-            [theme.breakpoints.down("sm")]: {
-                flexDirection: "column",
-                alignItems: "center",
-            },
-            [theme.breakpoints.down("md")]: {
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "center"
-            },
-            [theme.breakpoints.down("xs")]: {
-                alignItems: "start",
-            },
-        }
-    }))
-    const classes = useStyles();
-    const { user, setWatchlist } = CryptoState();
-    const addToWatchList = async () => {
-        const coinRef = doc(db, "watchlist", user.uid);
+    const updateWatchlist = async (shouldAdd) => {
+        if (!user || !coin) return;
+        const coinRef = doc(db, 'watchlist', user.uid);
+        const nextWatchlist = shouldAdd
+            ? [...new Set([...watchlist, coin.id])]
+            : watchlist.filter((watch) => watch !== coin.id);
         try {
-            await setDoc(coinRef,
-                { coins: watchlist ? [...watchlist, coin?.id] : [] });
+            await setDoc(coinRef, { coins: nextWatchlist }, { merge: true });
             setAlert({
                 open: true,
-                message: `${coin.name} Added to Watchlist!`,
+                message: `${coin.name} ${shouldAdd ? 'added to' : 'removed from'} your watchlist.`,
                 type: 'success'
             });
-        } catch (error) {
-            setAlert({
-                open: true,
-                message: error.message,
-                type: 'error'
-            });
+        } catch (writeError) {
+            setAlert({ open: true, message: writeError.message || 'Unable to update your watchlist.', type: 'error' });
         }
-    }
-    const removeFromWatchList = async () => {
-        const coinRef = doc(db, "watchlist", user.uid);
-        try {
-            await setDoc(coinRef,
-                {
-                    coins: watchlist.filter((watch) => watch !== coin?.id),
-                },
-                { merge: true });
-            setAlert({
-                open: true,
-                message: `${coin.name
-                    } Removed from Watchlist!`,
-                type: 'success'
-            });
-        } catch (error) {
-            setAlert({
-                open: true,
-                message: error.message,
-                type: 'error'
-            });
-        }
-    }
-    useEffect(() => {
-        if (user) {
-            const coinRef = doc(db, "watchlist", user.uid);
-            var unsubscribe = onSnapshot(coinRef, coin => {
-                if (coin.exists()) {
-                    setWatchlist(coin.data().coins)
-                }
-                else {
-                    console.log("No Items in Watchlist");
-                }
-                return () => {
-                    unsubscribe();
-                }
-            });
-        }
-    }, [user])
-    if (!coin) return <LinearProgress style={{ background: "gold" }}></LinearProgress>
-    else return <div className={classes.container}>
+    };
 
-        <div className={classes.sidebar}>
-            <img
-                src={coin?.image.large}
-                height="200"
-                style={{ marginBottom: 20 }}
-                alt={coin?.name} />
-            <Typography variant="h3" className={classes.heading}>
-                {coin?.name}
-            </Typography>
-            <Typography variant="subtitle1" className={classes.description}>
-                {parse(`${coin?.description.en.split(". ")[0]}`)}
-            </Typography>
-            <div className={classes.marketData}>
-                <span style={{ display: "flex" }}>
-                    <Typography variant="h5" className={classes.heading}>
-                        Rank:
-                    </Typography>
-                    &nbsp; &nbsp;
-                    <Typography variant="h5" style={{ fontFamily: "Montserrat" }}>
-                        {coin?.market_cap_rank}
-                    </Typography>
-                </span>
-                <span style={{ display: "flex" }}>
-                    <Typography variant="h5" className={classes.heading}>
-                        Current Price:
-                    </Typography>
-                    &nbsp; &nbsp;
-                    <Typography variant="h5" style={{ fontFamily: "Montserrat" }}>
-                        {symbol}{" "}
-                        {numberWithCommas(coin?.market_data.current_price[currency.toLowerCase()])}
-                    </Typography>
-                </span>
-                <span style={{ display: "flex" }}>
-                    <Typography variant="h5" className={classes.heading}>
-                        Market Cap:
-                    </Typography>
-                    &nbsp; &nbsp;
-                    <Typography variant="h5" style={{ fontFamily: "Montserrat" }}>
-                        {symbol}{" "}
-                        {coin?.market_data.market_cap[currency.toLowerCase()].toString().slice(0, -6)
-                        }M
-                    </Typography>
-                </span>
-                {user && (<Button variant='outlined'
-                    style={{
-                        width: "100%",
-                        height: 40,
-                        backgroundColor: inWatchlist ? "#ff0000" : "#EEBC1D"
-                    }}
-                    onClick={inWatchlist ? removeFromWatchList : addToWatchList}
-                >
-                    {inWatchlist ? "Remove from Watchlist" : "Add To WatchList"}
-                </Button>)}
-            </div>
+    if (loading) return <LinearProgress sx={{ backgroundColor: 'gold' }} />;
+    if (error) return <Alert severity="error" sx={{ m: 3 }}>{error}</Alert>;
+    if (!coin) return <Alert severity="info" sx={{ m: 3 }}>Coin details are unavailable.</Alert>;
+
+    const description = coin.description?.en?.split('. ')[0] || 'No description is available.';
+    const marketData = coin.market_data || {};
+    const currentPrice = marketData.current_price?.[currency.toLowerCase()];
+    const marketCap = marketData.market_cap?.[currency.toLowerCase()];
+
+    return (
+        <div className="coin-page-layout">
+            <section className="coin-sidebar">
+                <img src={coin.image?.large} height="200" style={{ marginBottom: 20 }} alt={coin.name} />
+                <Typography variant="h3" className="coin-heading">{coin.name}</Typography>
+                <Typography variant="subtitle1" className="coin-description">{parse(description)}</Typography>
+                <div className="coin-market-data">
+                    <div className="coin-market-row"><Typography variant="h5" className="coin-heading">Rank:</Typography><Typography variant="h5">{coin.market_cap_rank ?? '—'}</Typography></div>
+                    <div className="coin-market-row"><Typography variant="h5" className="coin-heading">Current Price:</Typography><Typography variant="h5">{symbol} {numberWithCommas(currentPrice)}</Typography></div>
+                    <div className="coin-market-row"><Typography variant="h5" className="coin-heading">Market Cap:</Typography><Typography variant="h5">{symbol} {marketCap == null ? '—' : numberWithCommas(marketCap / 1_000_000)}M</Typography></div>
+                    {user && (
+                        <Button
+                            variant="outlined"
+                            sx={{ width: '100%', height: 40, backgroundColor: inWatchlist ? '#ff0000' : '#EEBC1D', color: inWatchlist ? 'white' : 'black' }}
+                            onClick={() => updateWatchlist(!inWatchlist)}
+                        >
+                            {inWatchlist ? 'Remove from Watchlist' : 'Add To Watchlist'}
+                        </Button>
+                    )}
+                </div>
+            </section>
+            <CoinInfo coin={coin} />
         </div>
-        <CoinInfo coin={coin} />
-    </div >
-}
+    );
+};
+
 export default CoinPage;

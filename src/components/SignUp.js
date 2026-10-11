@@ -1,4 +1,4 @@
-import { Box, Button, TextField } from '@material-ui/core';
+import { Box, Button, TextField } from '@mui/material';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
 import React, { useState } from 'react'
 import { CryptoState } from '../CryptoContext';
@@ -9,10 +9,15 @@ const SignUp = ({ handleClose }) => {
     const [password, setPassword] = useState("");
     const [confirmPassword, setConfirmPassword] = useState("");
     const { setAlert } = CryptoState()
-    const handleSubmit = async () => {
+    const handleSubmit = async (event) => {
+        event?.preventDefault();
+        if (!email.trim() || !password || !confirmPassword) {
+            setAlert({ open: true, message: 'Please fill all the fields.', type: 'error' });
+            return;
+        }
         if (password !== confirmPassword) {
             setAlert({
-                open: "true",
+                open: true,
                 message: "Password do not match, Try Again! ",
                 type: "error"
             });
@@ -30,14 +35,14 @@ const SignUp = ({ handleClose }) => {
 
         } catch (error) {
             setAlert({
-                open: 'true',
+                open: true,
                 message: error.message,
                 type: 'error'
             });
             return;
         }
     }
-    return <Box p={3}
+    return <Box component="form" onSubmit={handleSubmit} p={3}
         style={{ display: "flex", flexDirection: "column", gap: "20px" }}
     >
         <TextField variant="outlined"
@@ -61,7 +66,7 @@ const SignUp = ({ handleClose }) => {
             onChange={(e) => setConfirmPassword(e.target.value)}
             fullWidth
         />
-        <Button variant='contained' size='large' style={{ backgroundColor: '#EEBC1D' }} onClick={handleSubmit}>Sign Up</Button>
+        <Button type="submit" variant='contained' size='large' style={{ backgroundColor: '#EEBC1D' }}>Sign Up</Button>
     </Box>
 }
 export default SignUp;

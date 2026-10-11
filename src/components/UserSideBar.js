@@ -1,71 +1,16 @@
 import React, { useState } from 'react';
-import { makeStyles } from '@material-ui/core/styles';
-import Drawer from '@material-ui/core/Drawer';
-import Button from '@material-ui/core/Button';
+import Drawer from '@mui/material/Drawer';
+import Button from '@mui/material/Button';
 import { CryptoState } from '../CryptoContext';
-import { Avatar } from '@material-ui/core';
+import { Avatar } from '@mui/material';
 import { signOut } from 'firebase/auth';
 import { auth, db } from '../firebase';
 import { numberWithCommas } from './Caraousel';
 import { AiFillDelete } from 'react-icons/ai'
 import { doc, setDoc } from 'firebase/firestore';
-const useStyles = makeStyles({
-    container: {
-        width: 350,
-        padding: 25,
-        height: "100%",
-        display: "flex",
-        flexDirection: "column",
-        fontFamily: "monospace"
-    },
-    profile: {
-        flex: 1,
-        display: "flex",
-        flexDirection: 'column',
-        alignItems: 'center',
-        gap: "20px",
-        height: '92%'
-    },
-    picture: {
-        width: 200,
-        height: 200,
-        cursor: 'pointer',
-        backgroundColor: '#EEBC1D',
-        objectFit: 'contain'
-    },
-    logout: {
-        height: '8%',
-        width: '100%',
-        backgroundColor: '#EEBC1D',
-        marginTop: 20
-    },
-    watchlist: {
-        flex: 1,
-        width: "100%",
-        backgroundColor: 'grey',
-        borderRadius: 10,
-        padding: 15,
-        paddingTop: 10,
-        display: "flex",
-        flexDirection: "column",
-        alignItems: 'center',
-        gap: 12,
-        overflowY: "scroll"
-    },
-    coin: {
-        padding: 10,
-        borderRadius: 5,
-        color: "black",
-        display: "flex",
-        justifyContent: "space-between",
-        alignItems: "center",
-        backgroundColor: "#EEBC1D",
-        boxShadow: "0 0 3px black"
-    }
-});
+
 
 export default function UserSideBar() {
-    const classes = useStyles();
     const { user, setAlert, watchlist, coins, symbol } = CryptoState();
     const [state, setState] = useState({
         right: false,
@@ -101,14 +46,14 @@ export default function UserSideBar() {
         setState({ ...state, [anchor]: open });
     };
 
-    const logout = () => {
-        signOut(auth);
-        setAlert({
-            open: 'true',
-            type: 'success',
-            message: 'Logout Successfull !'
-        });
-        toggleDrawer();
+    const logout = async () => {
+        try {
+            await signOut(auth);
+            setAlert({ open: true, type: 'success', message: 'You have been signed out.' });
+            setState({ right: false });
+        } catch (error) {
+            setAlert({ open: true, type: 'error', message: error.message || 'Unable to sign out.' });
+        }
     };
 
     return (
@@ -127,9 +72,9 @@ export default function UserSideBar() {
                         alt={user.displayName || user.email}
                     />
                     <Drawer anchor={anchor} open={state[anchor]} onClose={toggleDrawer(anchor, false)}>
-                        <div className={classes.container}>
-                            <div className={classes.profile}>
-                                <Avatar className={classes.picture} src={user.photoURL}
+                        <div className="sidebar-container">
+                            <div className="sidebar-profile">
+                                <Avatar className="sidebar-picture" src={user.photoURL}
                                     alt={user.displayName || user.email}
                                 />
                                 <span
@@ -143,25 +88,25 @@ export default function UserSideBar() {
                                 >
                                     {user.displayName || user.email}
                                 </span>
-                                <div className={classes.watchlist}>
+                                <div className="sidebar-watchlist">
                                     <span style={{
                                         fontSize: 15,
                                         textShadow: "0 0 5px black"
                                     }}>WatchList</span>
                                     {coins.map(coin => {
                                         if (watchlist.includes(coin.id))
-                                            return (<div className={classes.coin}>
+                                            return (<div className="sidebar-coin" key={coin.id}>
                                                 <span>{coin.name}</span>
                                                 <span style={{ display: "flex", gap: 8 }}>
                                                     {symbol}
-                                                    {numberWithCommas(coin.current_price.toFixed(2))}
+                                                    {numberWithCommas(coin.current_price)}
                                                     <AiFillDelete style={{ cursor: "pointer" }} onClick={() => removeFromWatchList(coin)} />
                                                 </span>
                                             </div>);
                                     })}
                                 </div>
                             </div>
-                            <Button variant='contained' className={classes.logout} onClick={logout}>Log Out</Button>
+                            <Button variant='contained' className="sidebar-logout" onClick={logout}>Log Out</Button>
                         </div>
                     </Drawer>
                 </React.Fragment>

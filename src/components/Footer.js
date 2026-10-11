@@ -1,5 +1,6 @@
 import React from 'react'
-import { Typography } from '@material-ui/core'
+import { Typography } from '@mui/material'
+import { FaHeart } from 'react-icons/fa'
 const Footer = () => {
     return (
         <Typography variant='h6' style={{
@@ -9,7 +10,7 @@ const Footer = () => {
             fontFamily: "Montserrat",
             padding: "2px",
             justifyContent: "center",
-        }}> Made with ❤️ by &nbsp;<a href='https://github.com/J-Ankit2020' target={"_blank"} rel="noreferrer">Ankit</a></ Typography >
+        }}>Built with&nbsp;<FaHeart aria-label="heart" style={{ color: '#e25555', marginRight: 6 }} />by&nbsp;sankalP</Typography>
     )
 }
 

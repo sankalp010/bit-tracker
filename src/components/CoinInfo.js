@@ -1,47 +1,37 @@
-import { makeStyles } from '@material-ui/styles';
 import React, { useState } from 'react'
 import { useEffect } from 'react';
 import { HistoricalChart } from '../config/api';
 import { CryptoState } from '../CryptoContext';
-import { CircularProgress } from '@material-ui/core';
+import { Alert, CircularProgress } from '@mui/material';
 import { Line } from 'react-chartjs-2';
 import 'chart.js/auto';
 import { chartDays } from '../config/data';
 import SelectButton from './SelectButton';
 const CoinInfo = ({ coin }) => {
-    const [historicData, setHistoricData] = useState();
+    const [historicData, setHistoricData] = useState(null);
+    const [error, setError] = useState('');
     const [days, setDays] = useState(1);
     const { currency } = CryptoState();
     const fetchHistoricData = async () => {
-        const response = await fetch(HistoricalChart(coin.id, days, currency));
-        const data = await response.json();
-        setHistoricData(data.prices);
+        setHistoricData(null);
+        setError('');
+        try {
+            const response = await fetch(HistoricalChart(coin.id, days, currency));
+            if (!response.ok) throw new Error(`Chart request failed (${response.status}).`);
+            const data = await response.json();
+            if (!Array.isArray(data.prices)) throw new Error('Chart service returned invalid data.');
+            setHistoricData(data.prices);
+        } catch (requestError) {
+            setError(requestError.message || 'Unable to load chart history.');
+        }
     }
     useEffect(() => {
         fetchHistoricData();
-    }, [currency, days]);
-    const useStyles = makeStyles((theme) => ({
-        container: {
-            width: "75%",
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            justifyContent: "center",
-            marginTop: 25,
-            padding: 40,
-            [theme.breakpoints.down("md")]: {
-                width: "100%",
-                marginTop: 0,
-                padding: 20,
-                paddingTop: 0
-            }
-        }
-    }))
-    const classes = useStyles();
+    }, [coin.id, currency, days]);
     return (
-        <div className={classes.container}>
+        <div className="coin-chart-container">
             {
-                !historicData ? (
+                error ? <Alert severity="error">{error}</Alert> : !historicData ? (
                     <CircularProgress
                         style={{ color: "gold" }}
                         size={250}
